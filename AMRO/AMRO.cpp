@@ -15,7 +15,7 @@ int fy(Ipp64f * field, Ipp64f *vx, Ipp64f *vz, int length, Ipp64f *temp, Ipp64f 
 int fz(Ipp64f * field, Ipp64f *vx, Ipp64f *vy, int length, Ipp64f *temp, Ipp64f *out);
 
 //int taufun(Ipp64f *params, Ipp64f *kx, Ipp64f *ky, int length, Ipp64f *temp, Ipp64f *out);
-int taufun(Ipp64f *params, Ipp64f *kx, Ipp64f *ky,Ipp64f *kz, int length, Ipp64f *temp, Ipp64f *out, Ipp64f *one);
+int taufun(Ipp64f *params, Ipp64f *kx, Ipp64f *ky, int length, Ipp64f *temp, Ipp64f *out, Ipp64f *one);
 int _tmain(int argc, _TCHAR* argv[])
 {
 	std::clock_t startT;
@@ -59,7 +59,8 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	//std::clock_t startT;
 	Ipp64f duration;
-
+	Ipp64f *zeros = new Ipp64f[nPoints];//for inverting
+	ippsSet_64f(0, zeros, nPoints);
 	Ipp64f *field = new Ipp64f[3];
 	Ipp64f *vzStorage = new Ipp64f[steps*nPoints];
 	Ipp64f *vz0Storage = new Ipp64f[nPoints];
@@ -100,6 +101,15 @@ int _tmain(int argc, _TCHAR* argv[])
 	Ipp64f *exptau = new Ipp64f[steps * nPoints];
 	Ipp64f total = 0;
 
+	Ipp64f *temp = new Ipp64f[10 * nPoints];
+	Ipp64f *upper_bound = new Ipp64f[nPoints];
+	ippsSet_64f(0.83828, upper_bound, nPoints);
+	Ipp64f *lower_bound = new Ipp64f[nPoints];
+	ippsSet_64f(-0.83828, lower_bound, nPoints);
+	Ipp64f *over_shift = new Ipp64f[nPoints];
+	ippsSet_64f(2 * 0.83828, upper_bound, nPoints);
+	Ipp64f *less_shift = new Ipp64f[nPoints];
+	ippsSet_64f(-2 * 0.83828, lower_bound, nPoints);
 	//startT = std::clock();
 
 	for (int j = 0; j < nPoints; j++) { //initialize Fermi surface to starting grid, only needs to be done once
@@ -146,7 +156,7 @@ int _tmain(int argc, _TCHAR* argv[])
 			veloZ(params, argx, argy, argz, nPoints, tempz, vz);
 			ippsCopy_64f(vz, &vzStorage[nPoints * (i - 1)], nPoints);//store vz for conductivity later
 			
-			taufun(params, argx, argy,argz, nPoints, tempx, taus,ones);// calculate k dependent tau
+			taufun(params, argx, argy, nPoints, tempx, taus,ones);// calculate k dependent tau
 			ippsDiv_64f_I(taus, &times[nPoints * (i-1)], nPoints);
 			//ippsDivC_64f_I(tau, &times[nPoints * (i - 1)], nPoints);
 			//ippsExp_64f_I(&times[nPoints * (i-1)], nPoints);
@@ -230,9 +240,59 @@ int _tmain(int argc, _TCHAR* argv[])
 			ippsMulC_64f_I(h / 6, tempx, nPoints); //scale the entire sum
 			ippsMulC_64f_I(h / 6, tempy, nPoints); //scale the entire sum
 			ippsMulC_64f_I(h / 6, tempz, nPoints); //scale the entire sum
-
+/*
 			ippsAdd_64f(&output[nPoints * (3 * (i - 1) + 0)], tempx, &output[nPoints * (3 * i + 0)], nPoints); //add sum to previous output and store
+			
 			ippsAdd_64f(&output[nPoints * (3 * (i - 1) + 1)], tempy, &output[nPoints * (3 * i + 1)], nPoints);
+	*/
+			ippsAdd_64f(&output[nPoints * (3 * (i - 1) + 0)], tempx, temp, nPoints); //add sum to previous output and store
+
+			//ippsSub_64f(upper_bound,temp,&temp[nPoints], nPoints);//find those larger than Pi/a
+			ippsSubC_64f(temp, 0.83828, &temp[nPoints], nPoints);//find those larger than Pi/a
+			ippsMaxEvery_64f(zeros, &temp[nPoints], &temp[2 * nPoints], nPoints);
+			ippsDiv_64f_I(&temp[nPoints], &temp[2 * nPoints], nPoints);
+			ippsMul_64f_I(less_shift, &temp[2 * nPoints], nPoints);
+			ippsAdd_64f(temp, &temp[2 * nPoints], &temp[3 * nPoints], nPoints);
+			//ippsAdd_64f(temp, &temp[2 * nPoints], &output[nPoints * (3 * i)], nPoints);
+
+			ippsSubC_64f(&temp[3 * nPoints], -0.83828, &temp[nPoints], nPoints);//find those smaller than Pi/a
+			ippsMinEvery_64f(zeros, &temp[nPoints], &temp[2 * nPoints], nPoints);
+			ippsDiv_64f_I(&temp[nPoints], &temp[2 * nPoints], nPoints);
+			ippsMul_64f_I(over_shift, &temp[2 * nPoints], nPoints);
+			ippsAdd_64f(&temp[3 * nPoints], &temp[2 * nPoints], &output[nPoints * (3 * i)], nPoints);
+
+			ippsAdd_64f(&output[nPoints * (3 * (i - 1) + 0)], tempx, temp, nPoints); //add sum to previous output and store
+
+			//ippsSub_64f(upper_bound,temp,&temp[nPoints], nPoints);//find those larger than Pi/a
+			ippsSubC_64f(temp, 0.83828, &temp[nPoints], nPoints);//find those larger than Pi/a
+			ippsMaxEvery_64f(zeros, &temp[nPoints], &temp[2 * nPoints], nPoints);
+			ippsDiv_64f_I(&temp[nPoints], &temp[2 * nPoints], nPoints);
+			ippsMul_64f_I(less_shift, &temp[2 * nPoints], nPoints);
+			ippsAdd_64f(temp, &temp[2 * nPoints], &temp[3 * nPoints], nPoints);
+			//ippsAdd_64f(temp, &temp[2 * nPoints], &output[nPoints * (3 * i)], nPoints);
+
+			ippsSubC_64f(&temp[3 * nPoints], -0.83828, &temp[nPoints], nPoints);//find those smaller than Pi/a
+			ippsMinEvery_64f(zeros, &temp[nPoints], &temp[2 * nPoints], nPoints);
+			ippsDiv_64f_I(&temp[nPoints], &temp[2 * nPoints], nPoints);
+			ippsMul_64f_I(over_shift, &temp[2 * nPoints], nPoints);
+			ippsAdd_64f(&temp[3 * nPoints], &temp[2 * nPoints], &output[nPoints * (3 * i)], nPoints);
+
+			ippsAdd_64f(&output[nPoints * (3 * (i - 1) + 1)], tempy, temp, nPoints); //add sum to previous output and store
+
+//ippsSub_64f(upper_bound,temp,&temp[nPoints], nPoints);//find those larger than Pi/a
+			ippsSubC_64f(temp, 0.83828, &temp[nPoints], nPoints);//find those larger than Pi/a
+			ippsMaxEvery_64f(zeros, &temp[nPoints], &temp[2 * nPoints], nPoints);
+			ippsDiv_64f_I(&temp[nPoints], &temp[2 * nPoints], nPoints);
+			ippsMul_64f_I(less_shift, &temp[2 * nPoints], nPoints);
+			ippsAdd_64f(temp, &temp[2 * nPoints], &temp[3 * nPoints], nPoints);
+			//ippsAdd_64f(temp, &temp[2 * nPoints], &output[nPoints * (3 * i)], nPoints);
+
+			ippsSubC_64f(&temp[3 * nPoints], -0.83828, &temp[nPoints], nPoints);//find those smaller than Pi/a
+			ippsMinEvery_64f(zeros, &temp[nPoints], &temp[2 * nPoints], nPoints);
+			ippsDiv_64f_I(&temp[nPoints], &temp[2 * nPoints], nPoints);
+			ippsMul_64f_I(over_shift, &temp[2 * nPoints], nPoints);
+			ippsAdd_64f(&temp[3 * nPoints], &temp[2 * nPoints], &output[nPoints * (3 * i + 1)], nPoints);
+
 			ippsAdd_64f(&output[nPoints * (3 * (i - 1) + 2)], tempz, &output[nPoints * (3 * i + 2)], nPoints);
 		}
 
@@ -243,7 +303,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		veloZ(params, argx, argy, argz, nPoints, tempz, vz);
 		ippsCopy_64f(vz, &vzStorage[nPoints * (steps - 1)], nPoints);
 
-		taufun(params, argx, argy, argz,nPoints, tempx, taus, ones);// calculate k dependent tau for last point
+		taufun(params, argx, argy, nPoints, tempx, taus, ones);// calculate k dependent tau for last point
 		ippsDiv_64f_I(taus, &times[nPoints * (steps - 1)], nPoints);
 		//ippsDivC_64f_I(tau, &times[nPoints * (steps - 1)], nPoints);
 		//ippsExp_64f_I(&times[nPoints * (steps - 1)], nPoints);
@@ -563,7 +623,7 @@ int fz(Ipp64f * field, Ipp64f *vx, Ipp64f *vy, int length, Ipp64f *temp, Ipp64f 
 
 //	return 0;
 //}
-/*
+
 int taufun(Ipp64f *params, Ipp64f *kx, Ipp64f *ky, int length, Ipp64f *temp, Ipp64f *out, Ipp64f *ones) {
 	ippsDiv_64f(kx, ky, temp, length);
 	//cout << temp[0] << endl;
@@ -593,7 +653,8 @@ int taufun(Ipp64f *params, Ipp64f *kx, Ipp64f *ky, int length, Ipp64f *temp, Ipp
 
 	return 0;
 }
-*/
+
+/*
 int taufun(Ipp64f *params, Ipp64f *kx, Ipp64f *ky, Ipp64f *kz, int length, Ipp64f *temp, Ipp64f *out, Ipp64f *ones) {
 	Ipp64f minDos = 0;
 	veloX(params, kx, ky, kz, length, &temp[3 * length], temp); //velocities for DOS are stored in vx, vy, and vz buffers.
@@ -625,3 +686,4 @@ int taufun(Ipp64f *params, Ipp64f *kx, Ipp64f *ky, Ipp64f *kz, int length, Ipp64
 
 	return 0;
 }
+*/
