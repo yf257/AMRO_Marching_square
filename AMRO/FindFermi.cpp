@@ -140,7 +140,7 @@ FindFermi::FindFermi( Ipp64f * param)
 	fineN = 400;//innitial grid inplane
 	NumLeng = 0;//number of contour 
 
-	cdevs =4;//Kz grid
+	cdevs =8;//Kz grid
 	//Ipp64f * starts = extractor.getDataArray();
 	//int nPoints = floor((extractor.getNumberOfLines()) / 2);
 	nPoints = 0;
@@ -163,7 +163,7 @@ FindFermi::FindFermi( Ipp64f * param)
 	lengArr = new int[20*cdevs];
 	kx = new Ipp64f[nfinepoint];
 	ky = new Ipp64f[nfinepoint];
-	finDis = 3.1415926 / 3.747665940 / 15;
+	finDis = 3.1415926 / 3.747665940 / 10;
 	tempx1 = new Ipp64f[nfinepoint];
 	tempy1 = new Ipp64f[nfinepoint];
 	tempx2 = new Ipp64f[nfinepoint];
@@ -237,7 +237,7 @@ FindFermi::FindFermi( Ipp64f * param)
 					current = i;
 					NumLeng = NumLeng + 1;
 					lengArr[NumLeng - 1] = 1;
-					cout << lengArr[NumLeng - 1] << endl;
+					//cout << lengArr[NumLeng - 1] << endl;
 					while (true) {
 						if ((current ) % fineN != 0 && funcval[current-1 + k * (fineN*fineN)] < 3.5 && funcval[current-1 + k * (fineN*fineN)] > 0.5) {
 							kx[nPoints] = 0.25*(tempx1[current - 1 + k * (fineN*fineN)] + tempx2[current - 1 + k * (fineN*fineN)] + tempx3[current - 1 + k * (fineN*fineN)] + tempx4[current - 1 + k * (fineN*fineN)]);
@@ -320,7 +320,7 @@ FindFermi::FindFermi( Ipp64f * param)
 							lengArr[NumLeng - 1] = lengArr[NumLeng - 1] + 1;
 							continue;
 						}
-						cout << lengArr[NumLeng - 1] << endl;
+						//cout << lengArr[NumLeng - 1] << endl;
 						break;
 
 					}
